@@ -1,0 +1,127 @@
+
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1">
+  <title>NSD LinkUp - LINE Login Test</title>
+
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+
+  <style>
+    body {
+      margin: 0;
+      padding: 25px;
+      background: #f3f7fc;
+      font-family: Arial, sans-serif;
+      color: #183153;
+    }
+
+    .card {
+      max-width: 420px;
+      margin: 60px auto;
+      padding: 28px;
+      border-radius: 18px;
+      background: white;
+      box-shadow: 0 4px 20px #00000012;
+      text-align: center;
+    }
+
+    button {
+      background: #06c755;
+      color: white;
+      border: none;
+      padding: 13px 24px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+
+    img {
+      width: 85px;
+      height: 85px;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+
+    #profile {
+      display: none;
+    }
+
+    #loginBtn {
+      display: none;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="card">
+    <h1>NSD LinkUp</h1>
+    <p>LINE Login Test</p>
+
+    <p id="status">กำลังเชื่อมต่อ LINE...</p>
+
+    <button id="loginBtn" onclick="loginLINE()">
+      เข้าสู่ระบบด้วย LINE
+    </button>
+
+    <div id="profile">
+      <img id="picture" alt="LINE Profile">
+      <h2 id="name"></h2>
+      <p>เข้าสู่ระบบ LINE สำเร็จ</p>
+    </div>
+  </div>
+
+  <script>
+    const LIFF_ID = "2012299016-h1Agjeey";
+
+    async function start() {
+      try {
+        await liff.init({ liffId: LIFF_ID });
+
+        if (!liff.isLoggedIn()) {
+          document.getElementById("status").textContent =
+            "ยังไม่ได้เข้าสู่ระบบ LINE";
+
+          document.getElementById("loginBtn")
+            .style.display = "inline-block";
+
+          return;
+        }
+
+        const profile = await liff.getProfile();
+
+        document.getElementById("status").textContent =
+          "เชื่อมต่อสำเร็จ";
+
+        document.getElementById("name").textContent =
+          profile.displayName;
+
+        if (profile.pictureUrl) {
+          document.getElementById("picture").src =
+            profile.pictureUrl;
+        } else {
+          document.getElementById("picture").style.display =
+            "none";
+        }
+
+        document.getElementById("profile")
+          .style.display = "block";
+
+      } catch (error) {
+        document.getElementById("status").textContent =
+          "เกิดข้อผิดพลาด: " + error.message;
+      }
+    }
+
+    function loginLINE() {
+      if (!liff.isLoggedIn()) {
+        liff.login();
+      }
+    }
+
+    start();
+  </script>
+</body>
+</html>
