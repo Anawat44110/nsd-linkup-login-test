@@ -5,11 +5,16 @@
   <meta charset="UTF-8">
   <meta name="viewport"
         content="width=device-width, initial-scale=1">
-  <title>NSD LinkUp - LINE Login Test</title>
+
+  <title>NSD LinkUp - LINE Login</title>
 
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 
   <style>
+    * {
+      box-sizing: border-box;
+    }
+
     body {
       margin: 0;
       padding: 25px;
@@ -19,13 +24,22 @@
     }
 
     .card {
-      max-width: 420px;
+      max-width: 440px;
       margin: 60px auto;
       padding: 28px;
       border-radius: 18px;
       background: white;
       box-shadow: 0 4px 20px #00000012;
       text-align: center;
+    }
+
+    h1 {
+      margin-bottom: 8px;
+    }
+
+    .subtitle {
+      color: #66788d;
+      margin-bottom: 25px;
     }
 
     button {
@@ -38,6 +52,11 @@
       font-size: 16px;
     }
 
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
     img {
       width: 85px;
       height: 85px;
@@ -45,83 +64,211 @@
       object-fit: cover;
     }
 
-    #profile {
+    #profile,
+    #loginBtn,
+    #retryBtn {
       display: none;
     }
 
-    #loginBtn {
-      display: none;
+    #status {
+      line-height: 1.6;
+      overflow-wrap: anywhere;
+    }
+
+    .success {
+      color: #16834a;
+    }
+
+    .error {
+      color: #c62828;
+    }
+
+    .verified {
+      display: inline-block;
+      margin-top: 12px;
+      padding: 8px 14px;
+      border-radius: 20px;
+      background: #e7f7ee;
+      color: #16834a;
+      font-size: 14px;
+    }
+
+    .secondary {
+      background: #168bd0;
+      margin-top: 15px;
     }
   </style>
 </head>
 
 <body>
+
   <div class="card">
     <h1>NSD LinkUp</h1>
-    <p>LINE Login Test</p>
+    <p class="subtitle">
+      Connect People, Create Moments.
+    </p>
 
-    <p id="status">กำลังเชื่อมต่อ LINE...</p>
+    <p id="status">
+      กำลังเชื่อมต่อ LINE...
+    </p>
 
     <button id="loginBtn" onclick="loginLINE()">
       เข้าสู่ระบบด้วย LINE
     </button>
 
+    <button id="retryBtn"
+            class="secondary"
+            onclick="start()">
+      ลองตรวจสอบอีกครั้ง
+    </button>
+
     <div id="profile">
       <img id="picture" alt="LINE Profile">
+
       <h2 id="name"></h2>
-      <p>เข้าสู่ระบบ LINE สำเร็จ</p>
+
+      <p class="success">
+        เข้าสู่ระบบ LINE สำเร็จ
+      </p>
+
+      <div class="verified">
+        ✓ ยืนยันตัวตนผ่าน LINE API แล้ว
+      </div>
     </div>
   </div>
 
   <script>
     const LIFF_ID = "2012299016-h1Agjeey";
 
+    const API_URL =
+      "https://nsd-linkup-api.anawaten44110.workers.dev/auth/line";
+
+    let liffReady = false;
+    let checking = false;
+
+    function setStatus(message, isError = false) {
+      const status = document.getElementById("status");
+      status.textContent = message;
+      status.className = isError ? "error" : "";
+    }
+
+    function showButton(id, visible) {
+      document.getElementById(id).style.display =
+        visible ? "inline-block" : "none";
+    }
+
     async function start() {
+      if (checking) return;
+
+      checking = true;
+
+      showButton("loginBtn", false);
+      showButton("retryBtn", false);
+
+      document.getElementById("profile").style.display =
+        "none";
+
+      setStatus("กำลังเชื่อมต่อ LINE...");
+
       try {
-        await liff.init({ liffId: LIFF_ID });
+        if (!liffReady) {
+          await liff.init({ liffId: LIFF_ID });
+          liffReady = true;
+        }
 
         if (!liff.isLoggedIn()) {
-          document.getElementById("status").textContent =
-            "ยังไม่ได้เข้าสู่ระบบ LINE";
-
-          document.getElementById("loginBtn")
-            .style.display = "inline-block";
-
+          setStatus("ยังไม่ได้เข้าสู่ระบบ LINE");
+          showButton("loginBtn", true);
           return;
         }
 
-        const profile = await liff.getProfile();
+        setStatus("กำลังตรวจสอบตัวตนกับ LINE...");
 
-        document.getElementById("status").textContent =
-          "เชื่อมต่อสำเร็จ";
+        const idToken = liff.getIDToken();
 
-        document.getElementById("name").textContent =
-          profile.displayName;
-
-        if (profile.pictureUrl) {
-          document.getElementById("picture").src =
-            profile.pictureUrl;
-        } else {
-          document.getElementById("picture").style.display =
-            "none";
+        if (!idToken) {
+          throw new Error(
+            "ไม่พบ LINE ID Token กรุณาเข้าสู่ระบบใหม่"
+          );
         }
 
-        document.getElementById("profile")
-          .style.display = "block";
+        const response = await fetch(API_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            idToken: idToken
+          }),
+          cache: "no-store"
+        });
+
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+          throw new Error(
+            result.message || "ตรวจสอบ LINE Login ไม่สำเร็จ"
+          );
+        }
+
+        const user = result.user || {};
+
+        document.getElementById("name").textContent =
+          user.displayName || "สมาชิก LINE";
+
+        const picture = document.getElementById("picture");
+
+        if (user.pictureUrl) {
+          picture.src = user.pictureUrl;
+          picture.style.display = "inline-block";
+        } else {
+          picture.removeAttribute("src");
+          picture.style.display = "none";
+        }
+
+        document.getElementById("profile").style.display =
+          "block";
+
+        setStatus("เชื่อมต่อและตรวจสอบตัวตนสำเร็จ");
+
+        document.getElementById("status").className =
+          "success";
 
       } catch (error) {
-        document.getElementById("status").textContent =
-          "เกิดข้อผิดพลาด: " + error.message;
+        console.error("LINE Login verification failed");
+
+        setStatus(
+          "เกิดข้อผิดพลาด: " + error.message,
+          true
+        );
+
+        showButton("retryBtn", true);
+
+      } finally {
+        checking = false;
       }
     }
 
     function loginLINE() {
+      if (!liffReady) {
+        setStatus(
+          "ระบบ LINE ยังไม่พร้อม กรุณาลองใหม่",
+          true
+        );
+        showButton("retryBtn", true);
+        return;
+      }
+
       if (!liff.isLoggedIn()) {
-        liff.login();
+        liff.login({
+          redirectUri: window.location.origin +
+            window.location.pathname
+        });
       }
     }
 
     start();
   </script>
+
 </body>
 </html>
